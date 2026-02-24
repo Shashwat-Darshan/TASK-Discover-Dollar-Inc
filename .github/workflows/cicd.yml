@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/crud-dd-mean-backend
-  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/crud-dd-mean-frontend
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/crud-dd-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/crud-dd-frontend
 
 jobs:
   build-and-push:
@@ -49,6 +49,7 @@ jobs:
   deploy-to-vm:
     runs-on: ubuntu-latest
     needs: build-and-push
+    if: ${{ secrets.VM_HOST != '' }}  # Only run if VM is configured
     steps:
       - name: Deploy latest images to Ubuntu VM
         uses: appleboy/ssh-action@v1.0.3
