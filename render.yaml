@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: crud-dd-backend
+    env: docker
+    repo: https://github.com/Shashwat-Darshan/TASK-Discover-Dollar-Inc
+    dockerfile: ./backend/Dockerfile
+    plan: free
+    region: ohio
+    healthCheckPath: /
+    envVars:
+      - key: MONGODB_URL
+        value: mongodb://mongodb:27017/dd_db
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+
+  - type: web
+    name: crud-dd-frontend
+    env: docker
+    repo: https://github.com/Shashwat-Darshan/TASK-Discover-Dollar-Inc
+    dockerfile: ./frontend/Dockerfile
+    plan: free
+    region: ohio
+    healthCheckPath: /
+    envVars:
+      - key: BACKEND_URL
+        value: https://crud-dd-backend.onrender.com
