@@ -5,21 +5,26 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  REGISTRY: docker.io
-  BACKEND_IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/crud-dd-backend
-  FRONTEND_IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/crud-dd-frontend
-
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    
+    outputs:
+      backend-image: ${{ steps.docker-meta.outputs.backend-image }}
+      frontend-image: ${{ steps.docker-meta.outputs.frontend-image }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set Docker Image Names
+        id: docker-meta
+        run: |
+          echo "backend-image=${{ secrets.DOCKER_USERNAME }}/crud-dd-backend:latest" >> $GITHUB_OUTPUT
+          echo "frontend-image=${{ secrets.DOCKER_USERNAME }}/crud-dd-frontend:latest" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -30,36 +35,15 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata (backend)
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
-          tags: |
-            type=sha,prefix={{branch}}-
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-
-      - name: Extract metadata (frontend)
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
-          tags: |
-            type=sha,prefix={{branch}}-
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-
       - name: Build and push Backend
         uses: docker/build-push-action@v5
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/crud-dd-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/crud-dd-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -69,34 +53,37 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/crud-dd-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/crud-dd-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && secrets.VM_HOST != ''
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Deploy to VM
+        if: secrets.VM_HOST != ''
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/crud-dd-backend:latest
           FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/crud-dd-frontend:latest
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "$VM_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H $VM_HOST >> ~/.ssh/known_hosts
           
-          ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa $VM_USER@$VM_HOST << 'EOF'
           set -e
           
           echo "Pulling latest images..."
@@ -109,8 +96,14 @@ jobs:
           echo "Stopping and removing old containers..."
           docker-compose down || true
           
+          echo "Creating .env file..."
+          cat > .env << ENVFILE
+          BACKEND_IMAGE=$BACKEND_IMAGE
+          FRONTEND_IMAGE=$FRONTEND_IMAGE
+          ENVFILE
+          
           echo "Starting new containers..."
-          BACKEND_IMAGE=$BACKEND_IMAGE FRONTEND_IMAGE=$FRONTEND_IMAGE docker-compose up -d
+          docker-compose -f docker-compose.prod.yml up -d
           
           echo "Waiting for services to be healthy..."
           sleep 10
@@ -122,6 +115,7 @@ jobs:
           EOF
 
       - name: Verify Deployment
+        if: secrets.VM_HOST != ''
         run: |
           sleep 5
           echo "Checking Frontend..."
@@ -129,5 +123,14 @@ jobs:
           echo "✓ Frontend is accessible"
           
           echo "Checking Backend API..."
-          curl -f http://${{ secrets.VM_HOST }}/api/tutorials || echo "API check failed"
+          curl -f http://${{ secrets.VM_HOST }}/api/tutorials|| echo "API check failed"
           echo "✓ Backend API is accessible"
+
+      - name: Build Success
+        if: success() && secrets.VM_HOST == ''
+        run: |
+          echo "✓ Docker images built and pushed successfully!"
+          echo "✓ VM deployment skipped (no VM_HOST secret configured)"
+          echo "Images are ready at Docker Hub:"
+          echo "  - ${{ secrets.DOCKER_USERNAME }}/crud-dd-backend:latest"
+          echo "  - ${{ secrets.DOCKER_USERNAME }}/crud-dd-frontend:latest"
