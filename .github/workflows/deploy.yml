@@ -68,8 +68,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if VM is configured
+        id: check-vm
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: |
+          if [ -z "$VM_HOST" ]; then
+            echo "vm_configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "vm_configured=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to VM
-        if: secrets.VM_HOST != ''
+        if: steps.check-vm.outputs.vm_configured == 'true'
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
@@ -115,7 +126,7 @@ jobs:
           EOF
 
       - name: Verify Deployment
-        if: secrets.VM_HOST != ''
+        if: steps.check-vm.outputs.vm_configured == 'true'
         run: |
           sleep 5
           echo "Checking Frontend..."
@@ -123,11 +134,11 @@ jobs:
           echo "✓ Frontend is accessible"
           
           echo "Checking Backend API..."
-          curl -f http://${{ secrets.VM_HOST }}/api/tutorials|| echo "API check failed"
+          curl -f http://${{ secrets.VM_HOST }}/api/tutorials || echo "API check failed"
           echo "✓ Backend API is accessible"
 
       - name: Build Success
-        if: success() && secrets.VM_HOST == ''
+        if: success() && steps.check-vm.outputs.vm_configured == 'false'
         run: |
           echo "✓ Docker images built and pushed successfully!"
           echo "✓ VM deployment skipped (no VM_HOST secret configured)"
