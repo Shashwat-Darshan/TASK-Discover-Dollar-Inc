@@ -1,16 +1,15 @@
 # ============================================
 # RENDER.APP ENVIRONMENT VARIABLES
 # ============================================
-# Paste these into Render's Environment section
-# for both backend and frontend services
+# For Docker-based MongoDB deployment
+# Uses docker-compose.prod.yml configuration
 #
-# Replace the placeholder values with your actual values
+# ============================================
+# BACKEND SERVICE (crud-dd-backend)
 # ============================================
 
-# MongoDB Atlas Connection String
-# Get from: MongoDB Atlas → Connect → Drivers
-# Format: mongodb+srv://username:password@cluster.mongodb.net/database
-MONGODB_URL=your_mongodb_atlas_connection_string_here
+# MongoDB Service Connection (Docker)
+MONGODB_URL=mongodb://mongodb:27017/dd_db
 
 # Node.js Environment
 NODE_ENV=production
@@ -18,7 +17,22 @@ NODE_ENV=production
 # Backend Server Port
 PORT=8080
 
-# Backend API URL (for frontend service)
-# Use the backend service URL from Render
-# Example: https://crud-dd-backend.onrender.com
+# ============================================
+# FRONTEND SERVICE (crud-dd-frontend)
+# ============================================
+
+# Backend API URL
 BACKEND_URL=https://crud-dd-backend.onrender.com
+
+# ============================================
+# DOCKER IMAGES (for docker-compose.prod.yml)
+# ============================================
+
+# MongoDB Docker Image
+MONGO_IMAGE=mongo:7
+
+# Backend Docker Image (from Docker Hub)
+BACKEND_IMAGE=shashwatxdarshan/crud-dd-backend:latest
+
+# Frontend Docker Image (from Docker Hub)
+FRONTEND_IMAGE=shashwatxdarshan/crud-dd-frontend:latest
