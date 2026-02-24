@@ -34,7 +34,7 @@
    
    **Final format:**
    ```
-   mongodb+srv://myuser:mypass@cluster0.abc123.mongodb.net/dd_db?retryWrites=true&w=majority
+   mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@cluster0.abc123.mongodb.net/dd_db?retryWrites=true&w=majority
    ```
 
 ### Step 2: Deploy Backend on Render
@@ -52,7 +52,7 @@
 6. **Copy and Paste the Backend Variables:**
 
 ```
-MONGODB_URL=mongodb+srv://myuser:mypass@cluster0.abc123.mongodb.net/dd_db?retryWrites=true&w=majority
+MONGODB_URL=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@cluster0.abc123.mongodb.net/dd_db?retryWrites=true&w=majority
 NODE_ENV=production
 PORT=8080
 ```
